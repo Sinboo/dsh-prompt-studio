@@ -500,7 +500,7 @@ function settingsUpdate(value: unknown): { components: PromptComponent[]; expect
   return { components, expectedRevision: record['expectedRevision'] as number }
 }
 
-function installRoutes(ctx: Context, catalog: RuntimeCatalogStore): void {
+function installRoutes(ctx: Context, scope: SettingsScope<StudioConfig>, catalog: RuntimeCatalogStore): void {
   ctx.inject(['webServer'], (routeCtx) => {
     routeCtx.effect(() => routeCtx.webServer.register({
       kind: 'exact',
@@ -526,11 +526,13 @@ function installRoutes(ctx: Context, catalog: RuntimeCatalogStore): void {
           }
           if (request.method === 'POST') {
             const update = settingsUpdate(await requestJson(request))
-            await routeCtx.settings.replace(
-              PROMPT_STUDIO_SETTINGS_NAMESPACE,
-              { components: update.components },
-              update.expectedRevision,
-            )
+            // The scope-level `replace` no longer takes an expected revision;
+            // refuse a stale write here so the client keeps its 409 contract.
+            const descriptor = ctx.settings.describe().find(row => row.ns === PROMPT_STUDIO_SETTINGS_NAMESPACE)
+            if (descriptor !== undefined && descriptor.revision !== update.expectedRevision) {
+              throw new Error(`prompt-studio settings revision conflict: expected ${update.expectedRevision}, current ${descriptor.revision}`)
+            }
+            await scope.replace({ components: update.components })
             respondJson(response, 200, settingsSnapshot(routeCtx))
             return
           }
@@ -628,7 +630,7 @@ export async function apply(ctx: Context): Promise<void> {
       ctx.logger.warn(error)
     }
   }, { prepend: true })
-  installRoutes(ctx, catalog)
+  installRoutes(ctx, scope, catalog)
 
   const initial = scope.get()
   validatePromptComponents(initial.components)

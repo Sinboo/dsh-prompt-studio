@@ -48,7 +48,7 @@ function renderStudio(components: PromptStudioState['components'] = []) {
     saveResource: vi.fn(() => Promise.resolve({ path: 'AGENTS.md', content: 'Be concise.\n', digest: 'next' })),
   } as unknown as PromptStudioStore
   const useSnapshot = (<T,>(selector: (state: PromptStudioState) => T): T => selector(remote))
-  const useSession = (<T,>(selector: (state: { nodes: unknown[]; running: boolean }) => T): T => selector({ nodes: [], running: false }))
+  const useSession = (<T,>(selector: (state: { queue: unknown[]; running: boolean }) => T): T => selector({ queue: [], running: false }))
   render(<PromptStudioView {...({ controller, useSnapshot, useSession } as unknown as PromptStudioViewProps)} />)
   return { controller }
 }

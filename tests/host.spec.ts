@@ -2,10 +2,10 @@ import { Context } from '@deepseek-ai/cordis'
 import { describe, expect, it } from 'vitest'
 import LlmRuntime, {
   createUserMessage,
-  deepFreeze,
   markAgentLoopRequest,
   type GenerateOptions,
 } from '@deepseek-ai/dsh-llm'
+import { deepFreeze } from '@deepseek-ai/dsh-util-values'
 import { SettingsProvider, type SettingsNamespace } from '@deepseek-ai/dsh-settings'
 import SessionStore, { SessionId } from '@deepseek-ai/dsh-session'
 import SystemPrompt, { renderPrompt } from '@deepseek-ai/dsh-system-prompt'

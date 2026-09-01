@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { CallId, createMessage, createUserMessage } from '@deepseek-ai/dsh-llm'
+import { ToolCallId, createMessage, createUserMessage } from '@deepseek-ai/dsh-llm'
 import { captureInjectedMessages, isInjectedContextMessage, requestLayout } from '../src/capture.ts'
 
 describe('automatic injected-context capture', () => {
@@ -19,8 +19,8 @@ describe('automatic injected-context capture', () => {
       source: { kind: 'plugin', plugin: 'future-context', form: 'catalog' },
     })
     const tool = createUserMessage({
-      content: [{ type: 'tool-result', toolCallId: CallId('call-1'), content: [], isError: false }],
-      source: { kind: 'tool', callId: CallId('call-1') },
+      content: [{ type: 'tool-result', toolCallId: ToolCallId('call-1'), content: [], isError: false }],
+      source: { kind: 'tool', callId: ToolCallId('call-1') },
     })
     const model = createMessage({
       role: 'assistant',

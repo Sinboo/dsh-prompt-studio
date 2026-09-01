@@ -5,6 +5,7 @@
     "outDir": "dist/types",
     "tsBuildInfoFile": "dist/tsconfig.tsbuildinfo",
     "typeRoots": [
+      "./.dsh/scripts/types",
       "./.dsh/node_modules/@types",
       "./node_modules/@types"
     ]
@@ -41,13 +42,10 @@
       "path": "./.dsh/packages/client/connection/tsconfig.client.json"
     },
     {
-      "path": "./.dsh/packages/client/runtime"
+      "path": "./.dsh/packages/client/store"
     },
     {
       "path": "./.dsh/packages/client/ui-slots"
-    },
-    {
-      "path": "./.dsh/packages/client/web-react"
     },
     {
       "path": "./.dsh/packages/client/ui-conversation"

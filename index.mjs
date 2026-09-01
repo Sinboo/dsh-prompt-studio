@@ -2,7 +2,7 @@ import { createHash } from "node:crypto";
 import { homedir } from "node:os";
 import { readFile, writeFile } from "node:fs/promises";
 import { dirname, isAbsolute, join, resolve } from "node:path";
-//#region ../dsh-oss/vendor/cosmokit/src/misc.ts
+//#region ../../../Users/wxb/deepseek-harness/vendor/cosmokit/src/misc.ts
 /** Return true when a value is `null` or `undefined`. */
 function isNullable(value) {
 	return value === null || value === void 0;
@@ -27,7 +27,7 @@ function pick(source, keys, forced) {
 	return result;
 }
 //#endregion
-//#region ../dsh-oss/vendor/cosmokit/src/types.ts
+//#region ../../../Users/wxb/deepseek-harness/vendor/cosmokit/src/types.ts
 /** Test values using `instanceof` with a `toStringTag` fallback. */
 function is(type, value) {
 	if (arguments.length === 1) return (value) => is(type, value);
@@ -129,7 +129,7 @@ function deepEqual(a, b, strict) {
 	}).every((key) => deepEqual(a[key], b[key], strict));
 }
 //#endregion
-//#region ../dsh-oss/vendor/cosmokit/src/time.ts
+//#region ../../../Users/wxb/deepseek-harness/vendor/cosmokit/src/time.ts
 let Time;
 (function(_Time) {
 	_Time.millisecond = 1;
@@ -200,7 +200,7 @@ let Time;
 	_Time.template = template;
 })(Time || (Time = {}));
 //#endregion
-//#region ../dsh-oss/vendor/schemastery/src/index.ts
+//#region ../../../Users/wxb/deepseek-harness/vendor/schemastery/src/index.ts
 const kSchema = Symbol.for("schemastery");
 const kValidationError = Symbol.for("ValidationError");
 globalThis.__schemastery_index__ ??= 0;
@@ -1489,7 +1489,7 @@ function settingsUpdate(value) {
 		expectedRevision: record["expectedRevision"]
 	};
 }
-function installRoutes(ctx, catalog) {
+function installRoutes(ctx, scope, catalog) {
 	ctx.inject(["webServer"], (routeCtx) => {
 		routeCtx.effect(() => routeCtx.webServer.register({
 			kind: "exact",
@@ -1515,7 +1515,9 @@ function installRoutes(ctx, catalog) {
 					}
 					if (request.method === "POST") {
 						const update = settingsUpdate(await requestJson(request));
-						await routeCtx.settings.replace(PROMPT_STUDIO_SETTINGS_NAMESPACE, { components: update.components }, update.expectedRevision);
+						const descriptor = ctx.settings.describe().find((row) => row.ns === PROMPT_STUDIO_SETTINGS_NAMESPACE);
+						if (descriptor !== void 0 && descriptor.revision !== update.expectedRevision) throw new Error(`prompt-studio settings revision conflict: expected ${update.expectedRevision}, current ${descriptor.revision}`);
+						await scope.replace({ components: update.components });
 						respondJson(response, 200, settingsSnapshot(routeCtx));
 						return;
 					}
@@ -1595,7 +1597,7 @@ async function apply(ctx) {
 			ctx.logger.warn(error);
 		}
 	}, { prepend: true });
-	installRoutes(ctx, catalog);
+	installRoutes(ctx, scope, catalog);
 	const initial = scope.get();
 	validatePromptComponents(initial.components);
 	pipeline.replace(initial.components);

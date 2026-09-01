@@ -146,5 +146,7 @@ DSH_ROOT=/path/to/dsh node scripts/build.mjs
 
 ## 已知前提
 
+- 需要 `deepseek-ai/deepseek-harness` `0.1.2-alpha.3` 及以上：客户端改用 `@deepseek-ai/dsh-client-store`（0.1.2 移除了 `dsh-client-runtime`），face 改用 hooks 形态，设置写回改走 scope `replace`。
+
 - 设置命名空间 `prompt-studio` 由插件在加载时自行注册（`applies: 'live'`），宿主无需任何白名单。
 - `/prompt-studio/*` HTTP 端点注册在 `webServer` 服务上，仅在 Web 组合下可用；无 Web 时插件仍可正常加载，只是不提供 HTTP 端点与浏览器标签页。
