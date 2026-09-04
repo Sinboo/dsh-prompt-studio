@@ -924,6 +924,15 @@ function nextOverrideId(components, target) {
 	const used = new Set(components.map((component) => component.id));
 	return uniqueComponentId(`override:${target}`, used);
 }
+/** The session event log across dsh API generations.
+*
+* dsh 0.1.2-rc.1 replaced the `events` array accessor with `snapshotEvents()`;
+* earlier releases (0.1.2-alpha.x) only expose `events`. Prefer the snapshot
+* API when present so forward versions stay supported. */
+function sessionEvents(session) {
+	const compat = session;
+	return compat.snapshotEvents?.() ?? compat.events ?? [];
+}
 //#endregion
 //#region src/config.ts
 const finiteOrder = Schema.transform(Schema.number(), (value) => {
@@ -1326,8 +1335,9 @@ var RuntimeCatalogStore = class {
 	}
 };
 function latestUserInput(agent) {
-	for (let index = agent.session.events.length - 1; index >= 0; index -= 1) {
-		const event = agent.session.events[index];
+	const events = sessionEvents(agent.session);
+	for (let index = events.length - 1; index >= 0; index -= 1) {
+		const event = events[index];
 		if (event?.type !== "user/message") continue;
 		return event.data.content.filter((block) => block.type === "text").map((block) => block.text).join("\n");
 	}
@@ -1608,4 +1618,4 @@ async function apply(ctx) {
 	await ctx.systemPrompt.assemble();
 }
 //#endregion
-export { DEFAULT_SUPPLEMENT_ORDER, PROMPT_STUDIO_NAMESPACE, PROMPT_STUDIO_RESOURCE_PATH, PROMPT_STUDIO_SETTINGS_NAMESPACE, PROMPT_STUDIO_SETTINGS_PATH, PROMPT_STUDIO_STATE_PATH, PROMPT_STUDIO_VIEW_ORDER, apply, buildDraftSystemComponents, inject, isNativeOverride, name, nextOverrideId, nextSupplementId, renderSupplementBoundary, renderSystemPreview, studioConfigSchema, validatePromptComponents };
+export { DEFAULT_SUPPLEMENT_ORDER, PROMPT_STUDIO_NAMESPACE, PROMPT_STUDIO_RESOURCE_PATH, PROMPT_STUDIO_SETTINGS_NAMESPACE, PROMPT_STUDIO_SETTINGS_PATH, PROMPT_STUDIO_STATE_PATH, PROMPT_STUDIO_VIEW_ORDER, apply, buildDraftSystemComponents, inject, isNativeOverride, latestUserInput, name, nextOverrideId, nextSupplementId, renderSupplementBoundary, renderSystemPreview, sessionEvents, studioConfigSchema, validatePromptComponents };

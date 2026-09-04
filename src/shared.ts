@@ -1,3 +1,5 @@
+import type { Session, SessionEvent } from '@deepseek-ai/dsh-session'
+
 /** Settings namespace shared by the Host registration and browser editor. */
 export const PROMPT_STUDIO_NAMESPACE = 'prompt-studio'
 
@@ -274,4 +276,17 @@ export function nextSupplementId(components: readonly PromptComponent[]): string
 export function nextOverrideId(components: readonly PromptComponent[], target: string): string {
   const used = new Set(components.map(component => component.id))
   return uniqueComponentId(`override:${target}`, used)
+}
+
+/** The session event log across dsh API generations.
+ *
+ * dsh 0.1.2-rc.1 replaced the `events` array accessor with `snapshotEvents()`;
+ * earlier releases (0.1.2-alpha.x) only expose `events`. Prefer the snapshot
+ * API when present so forward versions stay supported. */
+export function sessionEvents(session: Session): readonly SessionEvent[] {
+  const compat = session as Session & {
+    events?: readonly SessionEvent[]
+    snapshotEvents?: () => readonly SessionEvent[]
+  }
+  return compat.snapshotEvents?.() ?? compat.events ?? []
 }

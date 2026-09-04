@@ -35,6 +35,7 @@ import {
   PROMPT_STUDIO_STATE_PATH,
   isNativeOverride,
   renderSupplementBoundary,
+  sessionEvents,
   validatePromptComponents,
   type CapturedPromptComponent,
   type NativeOverride,
@@ -57,6 +58,7 @@ export {
   nextSupplementId,
   renderSystemPreview,
   renderSupplementBoundary,
+  sessionEvents,
   validatePromptComponents,
 } from './shared.ts'
 export type {
@@ -302,9 +304,10 @@ class RuntimeCatalogStore {
   }
 }
 
-function latestUserInput(agent: Agent): string | undefined {
-  for (let index = agent.session.events.length - 1; index >= 0; index -= 1) {
-    const event = agent.session.events[index]
+export function latestUserInput(agent: Agent): string | undefined {
+  const events = sessionEvents(agent.session)
+  for (let index = events.length - 1; index >= 0; index -= 1) {
+    const event = events[index]
     if (event?.type !== 'user/message') continue
     return event.data.content
       .filter(block => block.type === 'text')
