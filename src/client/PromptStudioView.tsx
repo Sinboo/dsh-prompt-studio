@@ -267,8 +267,15 @@ function CapturedComponentCard({
 }
 
 /** Conversation-view entry point. */
-export function PromptStudioView({ controller, useSnapshot, useSession }: PromptStudioViewProps): ReactNode {
-  const requestVersion = useSession(snapshot => `${snapshot.queue.length}:${snapshot.running ? 'running' : 'idle'}`)
+export function PromptStudioView({ controller, useSnapshot, useSession, useProjection }: PromptStudioViewProps): ReactNode {
+  // dsh 0.1.6-alpha.2 moved the pending queue off SessionSnapshot into the
+  // host-computed `inbox` projection (the old `snapshot.queue` field was
+  // removed). Hosts without the projection hook simply skip queue-driven
+  // refreshes; running-state refreshes work everywhere.
+  const inbox = useProjection !== undefined ? useProjection('inbox' as never) as unknown as { readonly 'next-turn'?: readonly unknown[] } | undefined : undefined
+  const queueLength = inbox?.['next-turn']?.length ?? 0
+  const running = useSession(snapshot => snapshot.running)
+  const requestVersion = `${queueLength}:${running ? 'running' : 'idle'}`
   useEffect(() => { void controller.load() }, [controller, requestVersion])
   return <PromptStudioSurface controller={controller} useSnapshot={useSnapshot} />
 }

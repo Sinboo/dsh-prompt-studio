@@ -2,7 +2,7 @@ import { createHash } from "node:crypto";
 import { homedir } from "node:os";
 import { readFile, writeFile } from "node:fs/promises";
 import { dirname, isAbsolute, join, resolve } from "node:path";
-//#region ../../../Users/wxb/deepseek-harness/vendor/cosmokit/src/misc.ts
+//#region ../deepseek-harness/vendor/cosmokit/src/misc.ts
 /** Return true when a value is `null` or `undefined`. */
 function isNullable(value) {
 	return value === null || value === void 0;
@@ -27,7 +27,7 @@ function pick(source, keys, forced) {
 	return result;
 }
 //#endregion
-//#region ../../../Users/wxb/deepseek-harness/vendor/cosmokit/src/types.ts
+//#region ../deepseek-harness/vendor/cosmokit/src/types.ts
 /** Test values using `instanceof` with a `toStringTag` fallback. */
 function is(type, value) {
 	if (arguments.length === 1) return (value) => is(type, value);
@@ -129,7 +129,7 @@ function deepEqual(a, b, strict) {
 	}).every((key) => deepEqual(a[key], b[key], strict));
 }
 //#endregion
-//#region ../../../Users/wxb/deepseek-harness/vendor/cosmokit/src/time.ts
+//#region ../deepseek-harness/vendor/cosmokit/src/time.ts
 let Time;
 (function(_Time) {
 	_Time.millisecond = 1;
@@ -200,7 +200,7 @@ let Time;
 	_Time.template = template;
 })(Time || (Time = {}));
 //#endregion
-//#region ../../../Users/wxb/deepseek-harness/vendor/schemastery/src/index.ts
+//#region ../deepseek-harness/vendor/schemastery/src/index.ts
 const kSchema = Symbol.for("schemastery");
 const kValidationError = Symbol.for("ValidationError");
 globalThis.__schemastery_index__ ??= 0;
@@ -1391,7 +1391,8 @@ function appendInjectionTurn(session, components) {
 				kind: "plugin",
 				plugin: PROMPT_STUDIO_MESSAGE_SOURCE
 			}
-		}
+		},
+		stream: []
 	}, { surfaceOp: "append" });
 	session.append("step/end", {
 		turn,

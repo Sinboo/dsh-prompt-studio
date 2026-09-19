@@ -368,6 +368,9 @@ function appendInjectionTurn(session: Session, components: readonly PromptCompon
         // type contract of AssistantMessage.
         source: { kind: 'plugin', plugin: PROMPT_STUDIO_MESSAGE_SOURCE },
       } as unknown as AssistantMessage,
+      // dsh 0.1.6 makes the compacted model stream a required field; a
+      // synthetic injection turn carries no model stream, so it stays empty.
+      stream: [],
     }, { surfaceOp: 'append' })
   }
   session.append('step/end', { turn, step: 1 })

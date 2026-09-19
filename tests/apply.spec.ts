@@ -1,3 +1,5 @@
+// @vitest-environment jsdom
+// (dsh 0.1.6's ui-slots pulls in use-sync-external-store, which needs a DOM global.)
 import { Context } from '@deepseek-ai/cordis'
 import { describe, expect, it, vi } from 'vitest'
 import { SlotRegistry } from '@deepseek-ai/dsh-client-ui-renderer/client'

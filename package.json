@@ -1,7 +1,7 @@
 {
   "name": "dsh-prompt-studio",
   "description": "Prompt Studio plugin for DeepSeek Harness: compose runtime prompts, overrides, and request-local synthetic turns in one live editor",
-  "version": "0.4.2",
+  "version": "0.4.3",
   "type": "module",
   "main": "./index.mjs",
   "exports": {

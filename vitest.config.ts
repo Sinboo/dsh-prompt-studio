@@ -15,6 +15,10 @@ export default {
   resolve: {
     tsconfigPaths: true,
     alias: {
+      // Pin React to the DSH checkout's copy: resolving `react` from this
+      // package walks up to ~/node_modules (a React 19 install) which breaks
+      // use-sync-external-store's React-18 internals probing under jsdom.
+      react: `${dshRoot}/packages/client/ui-chat/node_modules/react`,
       '@deepseek-ai/cordis': `${dshRoot}/vendor/cordis/src/index.ts`,
       '@deepseek-ai/schemastery': `${dshRoot}/vendor/schemastery/src/index.ts`,
       '@deepseek-ai/dsh-llm': pkgEntry('llm', 'llm'),
@@ -29,9 +33,11 @@ export default {
       '@deepseek-ai/dsh-typert-registry': pkgEntry('typert', 'registry'),
       '@deepseek-ai/dsh-client-store': pkgEntry('client', 'store'),
       '@deepseek-ai/dsh-client-ui-slots': pkgEntry('client', 'ui-slots'),
-      '@deepseek-ai/dsh-client-ui-renderer/client': pkgEntry('client', 'ui-renderer').replace('lib/index.js', 'lib/client.js'),
+      // lib/client.js is a window.__ModuleLoader__ browser bundle; suites that
+      // import the registry must take the sources instead of the artifact.
+      '@deepseek-ai/dsh-client-ui-renderer/client': `${dshRoot}/packages/client/ui-renderer/src/client/index.ts`,
       '@deepseek-ai/dsh-client-ui-renderer': pkgEntry('client', 'ui-renderer'),
-      '@deepseek-ai/dsh-client-ui-conversation/client': pkgEntry('client', 'ui-conversation').replace('lib/index.js', 'lib/client.js'),
+      '@deepseek-ai/dsh-client-ui-conversation/client': `${dshRoot}/packages/client/ui-conversation/src/client/index.ts`,
       '@deepseek-ai/dsh-client-ui-conversation': pkgEntry('client', 'ui-conversation'),
       '@deepseek-ai/dsh-client-ui-settings/client': pkgEntry('client', 'ui-settings').replace('lib/index.js', 'lib/client.js'),
       '@deepseek-ai/dsh-client-ui-settings': pkgEntry('client', 'ui-settings'),

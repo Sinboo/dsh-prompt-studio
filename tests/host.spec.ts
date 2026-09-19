@@ -56,7 +56,7 @@ async function boot(doc: Record<string, unknown> = {}) {
   await ctx.plugin(LlmRuntime)
   await ctx.plugin(SessionStore)
   await ctx.plugin(MemorySettings, doc)
-  await ctx.plugin(SystemPrompt, { includeHarnessIdentity: false, persona: 'Persona.' })
+  await ctx.plugin(SystemPrompt, { includeHarnessIdentity: false, personaPrefix: 'Persona.' })
   const webServer = new MemoryWebServer()
   ctx.provide('webServer', webServer as never)
   const fiber = ctx.plugin({ name: 'prompt-studio-test', inject: [...inject], apply })
