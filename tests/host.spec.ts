@@ -1,4 +1,4 @@
-import { Context } from '@deepseek-ai/cordis'
+import { Context, Service } from '@deepseek-ai/cordis'
 import { describe, expect, it } from 'vitest'
 import LlmRuntime, {
   createUserMessage,
@@ -49,6 +49,27 @@ class MemoryWebServer {
     })
     return { status, value: JSON.parse(body) as unknown }
   }
+
+  async post(path: string, value: unknown): Promise<{ status: number; value: unknown }> {
+    const url = new URL(path, 'http://test')
+    const route = this.routes.get(url.pathname)
+    if (route === undefined) throw new Error(`missing route ${url.pathname}`)
+    let status = 0
+    let body = ''
+    await route.handler({
+      method: 'POST',
+      url: `${url.pathname}${url.search}`,
+      // requestJson listens for 'data' then 'end'; emit the body immediately.
+      on(event: string, listener: (chunk?: Buffer) => void) {
+        if (event === 'data') setImmediate(() => listener(Buffer.from(JSON.stringify(value), 'utf8')))
+        if (event === 'end') setImmediate(() => listener())
+      },
+    } as never, {
+      writeHead(next: number) { status = next },
+      end(next?: string) { body = next ?? '' },
+    })
+    return { status, value: body ? JSON.parse(body) as unknown : undefined }
+  }
 }
 
 async function boot(doc: Record<string, unknown> = {}) {
@@ -63,6 +84,63 @@ async function boot(doc: Record<string, unknown> = {}) {
   await fiber.await()
   return { ctx, fiber, webServer }
 }
+
+/** A 0.1.7-rc.2-shaped host: the settings service lost `register`/`describe` and delivers config through `apply(ctx, config)`. */
+class Rc2Settings extends Service {
+  constructor(ctx: Context) { super(ctx, 'settings') }
+  configure(): () => void { return () => {} }
+}
+
+async function bootRc2(config: Record<string, unknown> = {}) {
+  const ctx = new Context()
+  await ctx.plugin(LlmRuntime)
+  await ctx.plugin(SessionStore)
+  await ctx.plugin(Rc2Settings)
+  await ctx.plugin(SystemPrompt, { includeHarnessIdentity: false, personaPrefix: 'Persona.' })
+  const webServer = new MemoryWebServer()
+  ctx.provide('webServer', webServer as never)
+  const fiber = ctx.plugin({
+    name: 'prompt-studio-test',
+    inject: [...inject],
+    apply(ctx2: Context) {
+      // The rc.2 loader resolves the `Config` export and invokes apply with the value.
+      return apply(ctx2, config as never)
+    },
+  })
+  await fiber.await()
+  return { ctx, fiber, webServer }
+}
+
+describe('Prompt Studio Host composition (0.1.7-rc.2 config export)', () => {
+  it('activates without settings.register and serves the config value over the settings route', async () => {
+    const component = {
+      id: 'supplement:system', kind: 'supplement', role: 'system',
+      order: 20, enabled: true, template: 'Configured.',
+    }
+    const { webServer } = await bootRc2({ components: [component] })
+    const snapshot = await webServer.get('/prompt-studio/settings')
+    expect(snapshot.status).toBe(200)
+    expect(snapshot.value).toMatchObject({
+      writable: true,
+      revision: 0,
+      value: { components: [component] },
+    })
+    // A stale revision is still refused with the 409-style error body.
+    const conflict = await webServer.post('/prompt-studio/settings', { components: [], expectedRevision: 5 })
+    expect(conflict.status).toBe(409)
+  })
+
+  it('keeps the rc.2 config-sourced component pipeline live', async () => {
+    const component = {
+      id: 'supplement:system', kind: 'supplement', role: 'system',
+      order: 20, enabled: true, template: 'Configured.',
+    }
+    const { ctx } = await bootRc2({ components: [component] })
+    expect(renderPrompt(await ctx.systemPrompt.assemble())).toBe(
+      'Persona.\n\nConfigured.',
+    )
+  })
+})
 
 describe('Prompt Studio Host composition', () => {
   it('keeps the existing settings-backed system component pipeline live', async () => {

@@ -11,14 +11,14 @@ import type {
   MessageId,
   StreamChunk,
 } from '@deepseek-ai/dsh-llm'
-import type { SettingsNamespace, SettingsScope } from '@deepseek-ai/dsh-settings'
+import type { SettingsNamespace } from '@deepseek-ai/dsh-settings'
 import type { Session, SessionId } from '@deepseek-ai/dsh-session'
 import type {
   AssembledSection,
   AssembleContext,
   PromptAssembly,
 } from '@deepseek-ai/dsh-system-prompt'
-import { studioConfigSchema } from './config.ts'
+import { createStudioScope, type StudioScope } from './settings-scope.ts'
 import { captureInjectedMessages, requestLayout } from './capture.ts'
 import {
   CapturedResourceConflictError,
@@ -75,13 +75,26 @@ export type {
 } from './shared.ts'
 export { studioConfigSchema } from './config.ts'
 
+/**
+ * dsh >= 0.1.7-rc.2: the loader resolves this schema and passes the parsed
+ * value to `apply(ctx, config)`. On older hosts it is inert — `apply` picks
+ * the live settings namespace when `ctx.settings.register` exists.
+ */
+export { studioConfigSchema as Config } from './config.ts'
+
 /** Branded Host settings key. */
 export const PROMPT_STUDIO_SETTINGS_NAMESPACE = PROMPT_STUDIO_NAMESPACE as SettingsNamespace
 
 /** Stable Cordis plugin name. */
 export const name = 'client-ui-prompt-studio'
 
-/** Host services required by the component and request pipelines. */
+/**
+ * Host services required by the component and request pipelines.
+ *
+ * Both host generations ship the `settings` service — 0.1.6 with the live
+ * `register` API, 0.1.7-rc.2+ with a service that only carries `configure`.
+ * The scope adapter in `settings-scope.ts` feature-detects the available one.
+ */
 export const inject = ['settings', 'systemPrompt', 'llm', 'sessions']
 
 const SYSTEM_SECTION_PREFIX = 'prompt-studio:supplement-section:'
@@ -481,13 +494,11 @@ function resourceErrorStatus(error: unknown): number {
   return 500
 }
 
-function settingsSnapshot(ctx: Context): PromptStudioSettingsSnapshot {
-  const descriptor = ctx.settings.describe().find(row => row.ns === PROMPT_STUDIO_SETTINGS_NAMESPACE)
-  if (descriptor === undefined) throw new Error('prompt-studio settings namespace is not registered')
-  const value = descriptor.value as StudioConfig
+function settingsSnapshot(scope: StudioScope): PromptStudioSettingsSnapshot {
+  const value = scope.get()
   return {
-    writable: ctx.settings.writable,
-    revision: descriptor.revision,
+    writable: true,
+    revision: scope.revision,
     value: { components: value.components.map(cloneComponent) },
   }
 }
@@ -506,7 +517,7 @@ function settingsUpdate(value: unknown): { components: PromptComponent[]; expect
   return { components, expectedRevision: record['expectedRevision'] as number }
 }
 
-function installRoutes(ctx: Context, scope: SettingsScope<StudioConfig>, catalog: RuntimeCatalogStore): void {
+function installRoutes(ctx: Context, scope: StudioScope, catalog: RuntimeCatalogStore): void {
   ctx.inject(['webServer'], (routeCtx) => {
     routeCtx.effect(() => routeCtx.webServer.register({
       kind: 'exact',
@@ -527,19 +538,17 @@ function installRoutes(ctx: Context, scope: SettingsScope<StudioConfig>, catalog
       handler: async (request, response) => {
         try {
           if (request.method === 'GET' || request.method === 'HEAD') {
-            respondJson(response, 200, settingsSnapshot(routeCtx), request.method === 'HEAD')
+            respondJson(response, 200, settingsSnapshot(scope), request.method === 'HEAD')
             return
           }
           if (request.method === 'POST') {
             const update = settingsUpdate(await requestJson(request))
-            // The scope-level `replace` no longer takes an expected revision;
-            // refuse a stale write here so the client keeps its 409 contract.
-            const descriptor = ctx.settings.describe().find(row => row.ns === PROMPT_STUDIO_SETTINGS_NAMESPACE)
-            if (descriptor !== undefined && descriptor.revision !== update.expectedRevision) {
-              throw new Error(`prompt-studio settings revision conflict: expected ${update.expectedRevision}, current ${descriptor.revision}`)
+            // Refuse a stale write here so the client keeps its 409 contract.
+            if (scope.revision !== update.expectedRevision) {
+              throw new Error(`prompt-studio settings revision conflict: expected ${update.expectedRevision}, current ${scope.revision}`)
             }
             await scope.replace({ components: update.components })
-            respondJson(response, 200, settingsSnapshot(routeCtx))
+            respondJson(response, 200, settingsSnapshot(scope))
             return
           }
           response.writeHead(405)
@@ -584,13 +593,9 @@ function installRoutes(ctx: Context, scope: SettingsScope<StudioConfig>, catalog
   })
 }
 
-/** Register the live namespace and unified component pipeline. */
-export async function apply(ctx: Context): Promise<void> {
-  const scope: SettingsScope<StudioConfig> = ctx.settings.register(
-    PROMPT_STUDIO_SETTINGS_NAMESPACE,
-    studioConfigSchema,
-    { applies: 'live' },
-  )
+/** Register the unified component pipeline; config source depends on host generation. */
+export async function apply(ctx: Context, liveConfig?: StudioConfig): Promise<void> {
+  const scope: StudioScope = await createStudioScope(ctx, liveConfig)
   const bindings = new RuntimeBindings()
   const pipeline = new ComponentPipeline(ctx, bindings)
   const catalog = new RuntimeCatalogStore()

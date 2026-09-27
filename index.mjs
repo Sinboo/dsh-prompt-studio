@@ -976,6 +976,39 @@ const uniqueComponents = Schema.transform(Schema.array(componentSchema), (compon
 /** Persisted settings schema. Only user-authored supplements are stored. */
 const studioConfigSchema = Schema.object({ components: uniqueComponents.default([]) });
 //#endregion
+//#region src/settings-scope.ts
+/** Whether this host still exposes the pre-0.1.7 live settings namespace API. */
+function hasLegacySettingsHost(ctx) {
+	return typeof ctx.settings?.register === "function";
+}
+/** Build the plugin's settings scope for this host generation. */
+async function createStudioScope(ctx, liveConfig) {
+	if (hasLegacySettingsHost(ctx)) return ctx.settings.register("prompt-studio", studioConfigSchema, { applies: "live" });
+	const initial = studioConfigSchema["~standard"].validate(liveConfig ?? {});
+	let current = { components: ((initial && "value" in initial ? initial.value : liveConfig ?? {}).components ?? []).map((component) => ({ ...component })) };
+	const watchers = /* @__PURE__ */ new Set();
+	const scope = {
+		revision: 0,
+		get() {
+			return current;
+		},
+		watch(callback) {
+			watchers.add(callback);
+			return () => {
+				watchers.delete(callback);
+			};
+		},
+		async replace(next) {
+			const components = (next.components ?? []).map((component) => ({ ...component }));
+			scope.revision += 1;
+			current = { components };
+			for (const callback of [...watchers]) callback({ components });
+			await ctx.fiber?.update?.({ components });
+		}
+	};
+	return scope;
+}
+//#endregion
 //#region src/capture.ts
 const CONVERSATION_SOURCE_KINDS = new Set([
 	"user",
@@ -1144,7 +1177,13 @@ async function saveCapturedResource(cwd, resource, content, expectedDigest) {
 const PROMPT_STUDIO_SETTINGS_NAMESPACE = PROMPT_STUDIO_NAMESPACE;
 /** Stable Cordis plugin name. */
 const name = "client-ui-prompt-studio";
-/** Host services required by the component and request pipelines. */
+/**
+* Host services required by the component and request pipelines.
+*
+* Both host generations ship the `settings` service — 0.1.6 with the live
+* `register` API, 0.1.7-rc.2+ with a service that only carries `configure`.
+* The scope adapter in `settings-scope.ts` feature-detects the available one.
+*/
 const inject = [
 	"settings",
 	"systemPrompt",
@@ -1478,13 +1517,11 @@ function resourceErrorStatus(error) {
 	if (error instanceof CapturedResourceConflictError) return 409;
 	return 500;
 }
-function settingsSnapshot(ctx) {
-	const descriptor = ctx.settings.describe().find((row) => row.ns === PROMPT_STUDIO_SETTINGS_NAMESPACE);
-	if (descriptor === void 0) throw new Error("prompt-studio settings namespace is not registered");
-	const value = descriptor.value;
+function settingsSnapshot(scope) {
+	const value = scope.get();
 	return {
-		writable: ctx.settings.writable,
-		revision: descriptor.revision,
+		writable: true,
+		revision: scope.revision,
 		value: { components: value.components.map(cloneComponent) }
 	};
 }
@@ -1521,15 +1558,14 @@ function installRoutes(ctx, scope, catalog) {
 			handler: async (request, response) => {
 				try {
 					if (request.method === "GET" || request.method === "HEAD") {
-						respondJson(response, 200, settingsSnapshot(routeCtx), request.method === "HEAD");
+						respondJson(response, 200, settingsSnapshot(scope), request.method === "HEAD");
 						return;
 					}
 					if (request.method === "POST") {
 						const update = settingsUpdate(await requestJson(request));
-						const descriptor = ctx.settings.describe().find((row) => row.ns === PROMPT_STUDIO_SETTINGS_NAMESPACE);
-						if (descriptor !== void 0 && descriptor.revision !== update.expectedRevision) throw new Error(`prompt-studio settings revision conflict: expected ${update.expectedRevision}, current ${descriptor.revision}`);
+						if (scope.revision !== update.expectedRevision) throw new Error(`prompt-studio settings revision conflict: expected ${update.expectedRevision}, current ${scope.revision}`);
 						await scope.replace({ components: update.components });
-						respondJson(response, 200, settingsSnapshot(routeCtx));
+						respondJson(response, 200, settingsSnapshot(scope));
 						return;
 					}
 					response.writeHead(405);
@@ -1566,9 +1602,9 @@ function installRoutes(ctx, scope, catalog) {
 		}), "prompt-studio: captured resource route");
 	});
 }
-/** Register the live namespace and unified component pipeline. */
-async function apply(ctx) {
-	const scope = ctx.settings.register(PROMPT_STUDIO_SETTINGS_NAMESPACE, studioConfigSchema, { applies: "live" });
+/** Register the unified component pipeline; config source depends on host generation. */
+async function apply(ctx, liveConfig) {
+	const scope = await createStudioScope(ctx, liveConfig);
 	const bindings = new RuntimeBindings();
 	const pipeline = new ComponentPipeline(ctx, bindings);
 	const catalog = new RuntimeCatalogStore();
@@ -1619,4 +1655,4 @@ async function apply(ctx) {
 	await ctx.systemPrompt.assemble();
 }
 //#endregion
-export { DEFAULT_SUPPLEMENT_ORDER, PROMPT_STUDIO_NAMESPACE, PROMPT_STUDIO_RESOURCE_PATH, PROMPT_STUDIO_SETTINGS_NAMESPACE, PROMPT_STUDIO_SETTINGS_PATH, PROMPT_STUDIO_STATE_PATH, PROMPT_STUDIO_VIEW_ORDER, apply, buildDraftSystemComponents, inject, isNativeOverride, latestUserInput, name, nextOverrideId, nextSupplementId, renderSupplementBoundary, renderSystemPreview, sessionEvents, studioConfigSchema, validatePromptComponents };
+export { studioConfigSchema as Config, studioConfigSchema, DEFAULT_SUPPLEMENT_ORDER, PROMPT_STUDIO_NAMESPACE, PROMPT_STUDIO_RESOURCE_PATH, PROMPT_STUDIO_SETTINGS_NAMESPACE, PROMPT_STUDIO_SETTINGS_PATH, PROMPT_STUDIO_STATE_PATH, PROMPT_STUDIO_VIEW_ORDER, apply, buildDraftSystemComponents, inject, isNativeOverride, latestUserInput, name, nextOverrideId, nextSupplementId, renderSupplementBoundary, renderSystemPreview, sessionEvents, validatePromptComponents };
